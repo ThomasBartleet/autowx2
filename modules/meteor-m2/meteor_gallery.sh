@@ -18,9 +18,9 @@ htmlTemplate="$wwwDir/index.tpl"
 # ---single gallery preparation------------------------------------------------#
 
 makethumb() {
-    obrazek="$1"
-    local thumbnail=$(basename "$obrazek" .jpg)".th.jpg"
-    convert -define jpeg:size=200x200 "$obrazek" -thumbnail '200x200^' granite: +swap -gravity center -extent 200x200 -composite -quality 82 "$thumbnail"
+    picture="$1"
+    local thumbnail=$(basename "$picture" .$imageExtension)".th.jpg"
+    convert -define jpeg:size=200x200 "$picture" -thumbnail '200x200^' granite: +swap -gravity center -extent 200x200 -composite -quality 82 "$thumbnail"
     echo "$thumbnail"
     }
 
@@ -37,7 +37,7 @@ varFreq=$(sed '7q;d' $logFile)
 
 dateTime=$(date -d @$varStart +"%Y-%m-%d")
 dateTimeDir=$(date -d @$varStart +"%Y/%m/%d")  # directory format of date, eg. 2018/11/22/
-wwwPath=$wwwRootPath/recordings/meteor/img/$dateTimeDir
+wwwPath=$imgdir/$dateTimeDir
 
 
 
@@ -45,21 +45,12 @@ wwwPath=$wwwRootPath/recordings/meteor/img/$dateTimeDir
 # -----------------------------------------------------------------------------#
 
 
-cd $rawImageDir
+cd $wwwPath
 
-if [ $(ls *.jpg 2> /dev/null | wc -l) = 0 ];
+if [ $(ls *.$imageExtension 2> /dev/null | wc -l) = 0 ];
 then
-  echo "no images";
+  echo "No images found to add to gallery";
 else
-
-  #
-  # should we resize images?
-  #
-
-  if [ "$resizeimageto" != "" ]; then
-    echo "Resizing images to $resizeimageto px"
-    mogrify -resize ${resizeimageto}x${resizeimageto}\> *.jpg
-  fi
 
   #
   # some headers
@@ -71,18 +62,15 @@ else
   #
   # loop over images and generate thumbnails
   #
-
-
-
-  for obrazek in *.jpg
+  for image in *.$imageExtension
   do
-  		echo "Thumb for $obrazek"
-  		base=$(basename $obrazek .jpg)
-      sizeof=$(du -sh "$obrazek" | cut -f 1)
+  		echo "Thumb for $image"
+  		base=$(basename $image .$imageExtension)
+      sizeof=$(du -sh "$image" | cut -f 1)
       # generate thumbnail
-      thumbnail=$(makethumb "$obrazek")
+      thumbnail=$(makethumb "$image")
   		echo $thumbnail
-      echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$obrazek'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+      echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$image'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
   done
 
 
@@ -90,15 +78,8 @@ else
   # get image core name
   #
 
-  meteorcorename=$(ls *.jpg | head -1 | cut -d "-" -f 1-2)
+  meteorcorename=$(ls *.$imageExtension | head -1 | cut -d "-" -f 1-2)
   echo $wwwPath/$meteorcorename > $wwwDir/meteor-last-recording.tmp
-
-  #
-  # move images to their destination
-  #
-
-  mv $rawImageDir/* $imgdir/
-  # cp $rawImageDir/* $imgdir/
 
 
   # ----consolidate data from the given day ------------------------------------#

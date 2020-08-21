@@ -5,14 +5,28 @@
 # where images from mrlpt are saved
 # (as declared in mlrptrc config file - check it!)
 # eg: /var/lrpt/images/
-rawImageDir="/meteor/img/raw/"
+rawImageDir="/home/pi/mlrpt/images/"
 
+medetExec="$baseDir/medet/medet_arm"
 
 # directory with meteor stuff
-meteorDir="$recordingDir/meteor/"
+meteorDir="$recordingDir/meteor"
+
+# directory of meteor recordings
+rootMeteorRecDir="$meteorDir/rec"
+recdir="$rootMeteorRecDir/"$(date +"%Y/%m/%d")
 
 # directory where the images finally will go
-imgdir="$meteorDir/img/"$(date +"%Y/%m/%d/")
+rootMeteorImgDir="$meteorDir/img"
+imgdir="$rootMeteorImgDir/"$(date +"%Y/%m/%d")
+
+# Option to save images as PNG or JPG (if neither, defaults to JPG)
+imageExtension="png"
+# imageExtension="jpg"
 
 # resize images to the given size to avoid growing of the repository; in px
 resizeimageto=1024
+
+# Shall we remove the audio and processing files? If not, comment out below
+# or leave blank.
+removeFiles="true"
