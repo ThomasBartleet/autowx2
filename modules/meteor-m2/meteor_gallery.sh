@@ -19,6 +19,8 @@ htmlTemplate="$wwwDir/index.tpl"
 
 makethumb() {
     picture="$1"
+    # Thumbnail can be in JPG, as we're not interested in super high quality for
+    # the thumbnail image. The actual image is more important.
     local thumbnail=$(basename "$picture" .$imageExtension)".th.jpg"
     convert -define jpeg:size=200x200 "$picture" -thumbnail '200x200^' granite: +swap -gravity center -extent 200x200 -composite -quality 82 "$thumbnail"
     echo "$thumbnail"
@@ -37,7 +39,7 @@ varFreq=$(sed '7q;d' $logFile)
 
 dateTime=$(date -d @$varStart +"%Y-%m-%d")
 dateTimeDir=$(date -d @$varStart +"%Y/%m/%d")  # directory format of date, eg. 2018/11/22/
-wwwPath=$imgdir/$dateTimeDir
+wwwPath=$rootMeteorImgDir/$dateTimeDir
 
 
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 
-processedFile="${recdir}/${3}"
-imageFile="${imgdir}/${3}"
+processedFile="${recdir}/${1}"
+imageFile="${imgdir}/${1}"
 normalisedAudioFile="${processedFile}.wav"
 demodulatedAudioFile="${processedFile}.qpsk"
 decodedAudioFile="${processedFile}.dec"
@@ -18,7 +18,7 @@ echo "Decoding in progress (QPSK to BMP)"
 
 # Get the image file extension
 if [ "$imageExtension" == "" ]; then
-  imageExtension = "jpg"
+  imageExtension="jpg"
 fi
 
 # Should we resize the image?
@@ -30,14 +30,16 @@ fi
 # Decide the file and make image.
 if [ -f $decodedAudioFile ]; then
     echo "I got a successful ${3}.dec file. Creating false color image"
-    ./medet/medet_arm $decodedAudioFile "${iageFile}-122" -r 66 -g 65 -b 64 -d
+    ./medet/medet_arm $decodedAudioFile "${imageFile}-122" -r 66 -g 65 -b 64 -d
     convert $resizeSwitch "${imageFile}-122.bmp" "${imageFile}.${imageExtension}"
-    rm "${imageFile}-122.bmp"
+    if [ -f "${imageFile}.${imageExtension}" ]; then
+      rm "${imageFile}-122.bmp"
+    fi
 else
     echo "[DEBUG] Meteor Decoding failed, either a bad pass/low SNR or a software problem"
 fi
 
-if [ "${removeAudio}" -ne "" ]; then
+if [ "${removeFiles}" -ne "" ]; then
     rm $normalisedAudioFile
     rm $demodulatedAudioFile
 fi

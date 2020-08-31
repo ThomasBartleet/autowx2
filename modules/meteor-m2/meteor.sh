@@ -56,10 +56,16 @@ echo "freq=$freq"
 
 
 #
-# recording sumbodule
+# recording submodule
 #
 
 source $scriptDir/meteor_record.sh $satellite $freq $fileNameCore "" "" $duration $peak
+
+#
+# Processing
+#
+
+source $scriptDir/meteor_process.sh $fileNameCore
 
 #
 # meteor gallery
