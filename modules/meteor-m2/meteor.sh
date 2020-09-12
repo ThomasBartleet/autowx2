@@ -8,6 +8,7 @@
 scriptDir="$(dirname "$(realpath "$0")")"
 source $scriptDir/basedir_conf.py
 source $baseDir/_listvars.sh
+source $baseDir/shell_functions.sh
 
 # read module config
 
