@@ -43,3 +43,7 @@ if [ "${removeFiles}" -ne "" ]; then
     rm $normalisedAudioFile
     rm $demodulatedAudioFile
 fi
+
+# Remove old data
+removeOldData -t $keepDataForDays -d rootMeteorImgDir
+removeOldData -t $keepDataForDays -d rootMeteorRecDir
