@@ -109,18 +109,25 @@ echo "</ul>" >> $dirList
 
 
 function gallery_meteor {
-
-howManyToday=$(ls $meteorDir/img/$(date +"%Y/%m/%d")/*-Ch0.jpg 2> /dev/null| wc -l)
+  local howManyToday meteorLastDir meteorLastLog indexFile lastDateTime lastDate lastTime
+howManyToday=$(ls $meteorDir/img/$(date +"%Y/%m/%d")/*.th.jpg 2> /dev/null | wc -l)
 meteorLastDir=$(dirname $(cat $wwwDir/meteor-last-recording.tmp))
 
+# Get last file name (contains date and time).
+meteorLastLog=$(basename $(cat $wwwDir/meteor-last-recording.tmp))
 
 echo "<h2>METEOR-M2 recordings</h2>" >> $dirList
 echo "<h4>Recent pass</h4>" >> $dirList
+if [ $meteorLastLog ];
+then
+  # Get date and time
+  lastDateTime=$(echo $meteorLastLog | cut -d "_" -f 1)
+  lastDate=$(echo $lastDateTime | cut -d "-" -f 1)
+  lastTime=$(echo $lastDateTime | cut -d "-" -f 2)
+  echo "<h6>($lastDate , $lastTime)</h6>" >> $dirList
+fi
 echo "<a href='$meteorLastDir/index.html'>" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Ch0.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Ch1.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Ch2.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Combo.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
+echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp).th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
 echo "</a>" >> $dirList
 
 echo "<p></p>" >> $dirList
@@ -137,8 +144,13 @@ do
     echo "<li>($m)" >> $dirList
     for d in $(ls $meteorDir/img/$y/$m/ | sort -n)
     do
-      # collect info about files in the directory
-      echo "<a href='${wwwRootPath}/recordings/meteor/img/$y/$m/$d/index.html'>$d</a> " >> $dirList
+      indexFile="recordings/meteor/img/$y/$m/$d/index.html"
+      # Only add a link to the index file if there is an index file.
+      if [[ -f "${wwwDir}/${indexFile}" ]];
+      then
+        # collect info about files in the directory
+        echo "<a href='${wwwRootPath}/${indexFile}'>$d</a> " >> $dirList
+      fi
     done
     echo "</li>" >> $dirList
   done
