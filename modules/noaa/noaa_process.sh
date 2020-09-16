@@ -3,14 +3,12 @@
 # file to process NOAA wav file to produce weather images
 # all variables are provided by noaa.sh
 
-
-
 #
 # get the image file extension
 #
 
-if [ "$imageExtension" == "" ]; then
-  imageExtension = "jpg"
+if [ ! $imageExtension ]; then
+  imageExtension="jpg"
 fi
 
 #
@@ -37,12 +35,12 @@ fi
 
 for enchancement in "${enchancements[@]}"
 do
-    echo "**** $enhancement"
-    wxtoimg -e $enchancement $withMapOutline $recdir/$fileNameCore.wav $imgdir/$fileNameCore-${enchancement}${withMapExtension}.png | tee -a $logFile
-    convert -quality 91 $resizeSwitch $imgdir/$fileNameCore-${enchancement}${withMapExtension}.png $imgdir/$fileNameCore-${enchancement}${withMapExtension}.${imageExtension}
-    if [ "$imageExtension" != "png" ]; then
-        rm $imdir/$fileNameCore-${endhancement}${withMapExtension}.png
-    fi
+  echo "**** $enhancement"
+  wxtoimg -e $enchancement $withMapOutline $recdir/$fileNameCore.wav $imgdir/$fileNameCore-${enchancement}${withMapExtension}.png | tee -a $logFile
+  convert -quality 91 $resizeSwitch $imgdir/$fileNameCore-${enchancement}${withMapExtension}.png $imgdir/$fileNameCore-${enchancement}${withMapExtension}.${imageExtension}
+  if [ "$imageExtension" != "png" ]; then
+      rm $imdir/$fileNameCore-${endhancement}${withMapExtension}.png
+  fi
 done
 
 sox $recdir/$fileNameCore.wav -n spectrogram -o $imgdir/$fileNameCore-spectrogram.png
@@ -51,3 +49,7 @@ convert -quality 90 $imgdir/$fileNameCore-spectrogram.png $imgdir/$fileNameCore-
 rm $imgdir/$fileNameCore-mapa.png
 rm $imgdir/$fileNameCore-spectrogram.png
 rm $recdir/$fileNameCore.wav
+
+# Remove old data
+removeOldData -t $keepDataForDays -d $rootImgDir
+removeOldData -t $keepDataForDays -d $rootRecDir
