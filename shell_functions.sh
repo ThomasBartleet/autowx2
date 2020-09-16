@@ -44,14 +44,16 @@ function removeFolderFromDirectory() {
 }
 
 removeOldData() {
+  # https://stackoverflow.com/a/16655341
+  local OPTIND directory timeDays arg
   while getopts ":d:t:" arg; do
     case $arg in
       d) 
         directory="${OPTARG}"
         ;;
 
-      s) 
-        timeDays="${OPTARG}"
+      t) 
+        timeDays=$OPTARG
         # Check if $timeDays is not a whole number:
         re_isanum='^[0-9]+$' # Regex: match whole positive numbers only
         if ! [[ $timeDays =~ $re_isanum ]] ; 
@@ -63,8 +65,9 @@ removeOldData() {
         ;;
     esac
   done
+  shift $((OPTIND-1))
 
-  if [[ ! $directory || -d $directory ]];
+  if [[ ! $directory || ! -d $directory ]];
   then
     echo "Error - Invalid directory: ${directory}"
     return -1
