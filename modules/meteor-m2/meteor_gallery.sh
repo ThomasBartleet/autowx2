@@ -75,7 +75,13 @@ else
       # generate thumbnail
       thumbnail=$(makethumb "$image")
   		echo $thumbnail
-      echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$image'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+
+      # If the base name is the same as the core filename, then we can add it.
+      # Otherwise, we'd be adding a thumbnail that isn't part of this recording.
+      if [ $base == $fileNameCore ];
+      then
+        echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$image'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+      fi
     fi
   done
 
