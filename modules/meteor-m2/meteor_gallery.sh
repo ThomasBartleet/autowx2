@@ -66,13 +66,17 @@ else
   #
   for image in *.$imageExtension
   do
+    # Create thumbnail image if it doesn't already exist
+    base=$(basename $image .$imageExtension | cut -d "." -f 1)
+    if [ ! -f "${base}.th.jpg" ];
+    then
   		echo "Thumb for $image"
-  		base=$(basename $image .$imageExtension)
       sizeof=$(du -sh "$image" | cut -f 1)
       # generate thumbnail
       thumbnail=$(makethumb "$image")
   		echo $thumbnail
       echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$image'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+    fi
   done
 
 
