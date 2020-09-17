@@ -104,12 +104,4 @@ else
   htmlBody=$(cat $indexHtml.tmp)
 
   source $htmlTemplate > $indexHtml
-
-  #
-  # generate static main page(s)
-  #
-
-  $baseDir/bin/gen-static-page.sh
-
-
 fi # there are images

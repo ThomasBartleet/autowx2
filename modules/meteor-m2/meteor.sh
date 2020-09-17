@@ -73,3 +73,9 @@ source $scriptDir/meteor_process.sh $fileNameCore
 #
 
 source $scriptDir/meteor_gallery.sh 
+
+#
+# generate static main page(s)
+#
+
+source $baseDir/bin/gen-static-page.sh
