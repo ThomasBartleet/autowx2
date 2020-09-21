@@ -7,27 +7,48 @@ source $scriptDir/basedir_conf.py
 source $baseDir/_listvars.sh
 
 ###
+tempStorage="tle.tmp"
 
-TLEDIR=$baseDir/var/tle/
+function getData {
+    local option link targetFile
+
+    if [ $# != 2 ];
+    then
+        echo "2 parameters required. No more, no less."
+        exit 1
+    fi
+
+    link=$1
+    targetFile=$2
+
+    if [[ -z "${targetFile}" || -z "${link}" ]];
+    then
+        echo "Target file and URL link must be set."
+        echo "Target file: ${targetFile}"
+        echo "URL link: ${link}"
+        exit 1
+    fi
+
+    wget -r $link -O $TLEDIR/$tempStorage
+    if [[ -f $TLEDIR/$tempStorage && "$(cat $TLEDIR/$tempStorage)" != "" ]];
+    then
+        cat $TLEDIR/$tempStorage > $TLEDIR/$targetFile
+    fi
+}
+
+TLEDIR=${baseDir}var/tle
 mkdir -p $TLEDIR
 
-rm $TLEDIR/weather.txt
-wget --no-check-certificate -r http://www.celestrak.com/NORAD/elements/weather.txt -O $TLEDIR/weather.txt
+getData http://www.celestrak.com/NORAD/elements/weather.txt weather.txt
 
-#rm $TLEDIR/noaa.txt
-#wget -r http://www.celestrak.com/NORAD/elements/noaa.txt -O $TLEDIR/noaa.txt
+# getData http://www.celestrak.com/NORAD/elements/noaa.txt noaa.txt
 
-rm $TLEDIR/amateur.txt
-wget -r http://www.celestrak.com/NORAD/elements/amateur.txt -O $TLEDIR/amateur.txt
+getData http://www.celestrak.com/NORAD/elements/amateur.txt amateur.txt
 
-rm $TLEDIR/cubesat.txt
-wget -r http://www.celestrak.com/NORAD/elements/cubesat.txt -O $TLEDIR/cubesat.txt
+getData http://www.celestrak.com/NORAD/elements/cubesat.txt cubesat.txt
 
+getData http://www.pe0sat.vgnet.nl/kepler/mykepler.txt multi.txt
 
-rm $TLEDIR/multi.txt
-wget -r http://www.pe0sat.vgnet.nl/kepler/mykepler.txt -O $TLEDIR/multi.txt
-
-rm $TLEDIR/all.txt
 cat $TLEDIR/*.txt > $TLEDIR/all.txt
 
 
