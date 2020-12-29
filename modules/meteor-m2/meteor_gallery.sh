@@ -47,6 +47,7 @@ wwwPath="/recordings/meteor/img/${dateTimeDir}"
 # -----------------------------------------------------------------------------#
 
 
+
 cd "./var/www${wwwPath}"
 
 if [ $(ls *.$imageExtension 2> /dev/null | wc -l) = 0 ];
@@ -66,24 +67,34 @@ else
   #
   for image in *.$imageExtension
   do
+    # Create thumbnail image if it doesn't already exist
+    base=$(basename $image .$imageExtension | cut -d "." -f 1)
+    if [ ! -f "${base}.th.jpg" ];
+    then
   		echo "Thumb for $image"
-  		base=$(basename $image .$imageExtension)
       sizeof=$(du -sh "$image" | cut -f 1)
       # generate thumbnail
       thumbnail=$(makethumb "$image")
   		echo $thumbnail
-      echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$image'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+
+      # If the base name is the same as the core filename, then we can add it.
+      # Otherwise, we'd be adding a thumbnail that isn't part of this recording.
+      if [ $base == $fileNameCore ];
+      then
+        echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$image'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+      fi
+    fi
   done
 
 
   #
   # get image core name
   #
-  # From the full file name, get the head (?). From the file name:
-  # 1. Split the string on the underscore character ('_'), and retain the 2nd item.
-  # 2. Split that string on the period character ('.'), and retain the 1st item.
-  meteorcorename=$(ls *.$imageExtension | head -1 | cut -d "_" -f 2 | cut -d "." -f 1)
-  echo $wwwPath/$meteorcorename > $wwwDir/meteor-last-recording.tmp
+  # From the list of files, get the first file. From the file name, split that
+  # string on the period character ('.'), and retain the 1st item (remove all
+  # extensions).
+  meteorcorename=$(ls *.$imageExtension | head -1 | cut -d "." -f 1)
+  echo $wwwPath/$fileNameCore > $wwwDir/meteor-last-recording.tmp
 
 
   # ----consolidate data from the given day ------------------------------------#
@@ -104,12 +115,4 @@ else
   htmlBody=$(cat $indexHtml.tmp)
 
   source $htmlTemplate > $indexHtml
-
-  #
-  # generate static main page(s)
-  #
-
-  $baseDir/bin/gen-static-page.sh
-
-
 fi # there are images
