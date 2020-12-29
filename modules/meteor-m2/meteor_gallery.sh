@@ -47,6 +47,7 @@ wwwPath="/recordings/meteor/img/${dateTimeDir}"
 # -----------------------------------------------------------------------------#
 
 
+
 cd "./var/www${wwwPath}"
 
 if [ $(ls *.$imageExtension 2> /dev/null | wc -l) = 0 ];
@@ -89,11 +90,11 @@ else
   #
   # get image core name
   #
-  # From the full file name, get the head (?). From the file name:
-  # 1. Split the string on the underscore character ('_'), and retain the 2nd item.
-  # 2. Split that string on the period character ('.'), and retain the 1st item.
-  meteorcorename=$(ls *.$imageExtension | head -1 | cut -d "_" -f 2 | cut -d "." -f 1)
-  echo $wwwPath/$meteorcorename > $wwwDir/meteor-last-recording.tmp
+  # From the list of files, get the first file. From the file name, split that
+  # string on the period character ('.'), and retain the 1st item (remove all
+  # extensions).
+  meteorcorename=$(ls *.$imageExtension | head -1 | cut -d "." -f 1)
+  echo $wwwPath/$fileNameCore > $wwwDir/meteor-last-recording.tmp
 
 
   # ----consolidate data from the given day ------------------------------------#

@@ -30,7 +30,7 @@ fi
 # Decide the file and make image.
 if [ -f $decodedAudioFile ]; then
     echo "I got a successful ${3}.dec file. Creating false color image"
-    ./medet/medet_arm $decodedAudioFile "${imageFile}-122" -r 66 -g 65 -b 64 -d
+    ./medet/medet_arm $decodedAudioFile "${imageFile}-122" -r 68 -g 65 -b 64 -d
     convert $resizeSwitch "${imageFile}-122.bmp" "${imageFile}.${imageExtension}"
     if [ -f "${imageFile}.${imageExtension}" ]; then
       rm "${imageFile}-122.bmp"
@@ -45,5 +45,5 @@ if [ "${removeFiles}" -ne "" ]; then
 fi
 
 # Remove old data
-removeOldData -t $keepDataForDays -d rootMeteorImgDir
-removeOldData -t $keepDataForDays -d rootMeteorRecDir
+removeOldData -t $keepDataForDays -d $rootMeteorImgDir
+removeOldData -t $keepDataForDays -d $rootMeteorRecDir
