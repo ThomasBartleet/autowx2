@@ -18,9 +18,11 @@ htmlTemplate="$wwwDir/index.tpl"
 # ---single gallery preparation------------------------------------------------#
 
 makethumb() {
-    obrazek="$1"
-    local thumbnail=$(basename "$obrazek" .jpg)".th.jpg"
-    convert -define jpeg:size=200x200 "$obrazek" -thumbnail '200x200^' granite: +swap -gravity center -extent 200x200 -composite -quality 82 "$thumbnail"
+    picture="$1"
+    # Thumbnail can be in JPG, as we're not interested in super high quality for
+    # the thumbnail image. The actual image is more important.
+    local thumbnail=$(basename "$picture" .$imageExtension)".th.jpg"
+    convert -define jpeg:size=200x200 "$picture" -thumbnail '200x200^' granite: +swap -gravity center -extent 200x200 -composite -quality 82 "$thumbnail"
     echo "$thumbnail"
     }
 
@@ -37,7 +39,7 @@ varFreq=$(sed '7q;d' $logFile)
 
 dateTime=$(date -d @$varStart +"%Y-%m-%d")
 dateTimeDir=$(date -d @$varStart +"%Y/%m/%d")  # directory format of date, eg. 2018/11/22/
-wwwPath=$wwwRootPath/recordings/meteor/img/$dateTimeDir
+wwwPath="/recordings/meteor/img/${dateTimeDir}"
 
 
 
@@ -45,21 +47,13 @@ wwwPath=$wwwRootPath/recordings/meteor/img/$dateTimeDir
 # -----------------------------------------------------------------------------#
 
 
-cd $rawImageDir
 
-if [ $(ls *.jpg 2> /dev/null | wc -l) = 0 ];
+cd "./var/www${wwwPath}"
+
+if [ $(ls *.$imageExtension 2> /dev/null | wc -l) = 0 ];
 then
-  echo "no images";
+  echo "No images found to add to gallery";
 else
-
-  #
-  # should we resize images?
-  #
-
-  if [ "$resizeimageto" != "" ]; then
-    echo "Resizing images to $resizeimageto px"
-    mogrify -resize ${resizeimageto}x${resizeimageto}\> *.jpg
-  fi
 
   #
   # some headers
@@ -71,34 +65,36 @@ else
   #
   # loop over images and generate thumbnails
   #
-
-
-
-  for obrazek in *.jpg
+  for image in *.$imageExtension
   do
-  		echo "Thumb for $obrazek"
-  		base=$(basename $obrazek .jpg)
-      sizeof=$(du -sh "$obrazek" | cut -f 1)
+    # Create thumbnail image if it doesn't already exist
+    base=$(basename $image .$imageExtension | cut -d "." -f 1)
+    if [ ! -f "${base}.th.jpg" ];
+    then
+  		echo "Thumb for $image"
+      sizeof=$(du -sh "$image" | cut -f 1)
       # generate thumbnail
-      thumbnail=$(makethumb "$obrazek")
+      thumbnail=$(makethumb "$image")
   		echo $thumbnail
-      echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$obrazek'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+
+      # If the base name is the same as the core filename, then we can add it.
+      # Otherwise, we'd be adding a thumbnail that isn't part of this recording.
+      if [ $base == $fileNameCore ];
+      then
+        echo "<a data-fancybox='gallery' data-caption='$varSat | $varDate ($sizeof)' href='$wwwPath/$image'><img src='$wwwPath/$thumbnail' alt='meteor image' title='$sizeof' class='img-thumbnail' /></a> " >> $outHtml
+      fi
+    fi
   done
 
 
   #
   # get image core name
   #
-
-  meteorcorename=$(ls *.jpg | head -1 | cut -d "-" -f 1-2)
-  echo $wwwPath/$meteorcorename > $wwwDir/meteor-last-recording.tmp
-
-  #
-  # move images to their destination
-  #
-
-  mv $rawImageDir/* $imgdir/
-  # cp $rawImageDir/* $imgdir/
+  # From the list of files, get the first file. From the file name, split that
+  # string on the period character ('.'), and retain the 1st item (remove all
+  # extensions).
+  meteorcorename=$(ls *.$imageExtension | head -1 | cut -d "." -f 1)
+  echo $wwwPath/$fileNameCore > $wwwDir/meteor-last-recording.tmp
 
 
   # ----consolidate data from the given day ------------------------------------#
@@ -119,12 +115,4 @@ else
   htmlBody=$(cat $indexHtml.tmp)
 
   source $htmlTemplate > $indexHtml
-
-  #
-  # generate static main page(s)
-  #
-
-  $baseDir/bin/gen-static-page.sh
-
-
 fi # there are images

@@ -8,6 +8,7 @@
 scriptDir="$(dirname "$(realpath "$0")")"
 source $scriptDir/basedir_conf.py
 source $baseDir/_listvars.sh
+source $baseDir/shell_functions.sh
 
 # read module config
 
@@ -56,13 +57,25 @@ echo "freq=$freq"
 
 
 #
-# recording sumbodule
+# recording submodule
 #
 
-source $scriptDir/meteor_record.sh
+source $scriptDir/meteor_record.sh $satellite $freq $fileNameCore "" "" $duration $peak
+
+#
+# Processing
+#
+
+source $scriptDir/meteor_process.sh $fileNameCore
 
 #
 # meteor gallery
 #
 
-source $scriptDir/meteor_gallery.sh
+source $scriptDir/meteor_gallery.sh 
+
+#
+# generate static main page(s)
+#
+
+source $baseDir/bin/gen-static-page.sh

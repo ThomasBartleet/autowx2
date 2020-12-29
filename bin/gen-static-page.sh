@@ -41,12 +41,16 @@ lastkepsU=$(cat "$wwwDir/kepsU.tmp")
 
 keplerDays=$(echo "(($(date +"%s") - $lastkepsU ) / (60*60*24))" | bc )
 echo $keplerDays
-if [ $keplerDays -le 7 ]; then keplerInfo="<span class='badge badge-pill badge-success'>OK</span>"
-else keplerInfo="<span class='badge badge-pill badge-danger'>outdated</span>"; fi
+if [ $keplerDays -le 7 ]; 
+then
+  keplerInfo="<span class='badge badge-pill badge-success'>OK</span>"
+else
+  keplerInfo="<span class='badge badge-pill badge-danger'>outdated</span>"
+fi
 
 echo "lastkeps: $lastkeps"
 
-keplerInfo="Keplers updated: $lastkeps ($keplerDays days old) $keplerInfo<br />"
+keplerInfo="Keplers last updated: $lastkeps ($keplerDays days old) $keplerInfo<br />"
 
 ##### autowx2 uptime ########
 
@@ -63,89 +67,138 @@ autowxUptime="autowx2 uptime: $autowxUptimeH h (~$autowxUptimeD d)<br />"
 
 shortlistofnextpassess="<br/>Next passes: $(cat "$wwwDir/nextpassshort.tmp")<br />"
 
+function echoSetValueFor {
+  echo "Please set an appropriate value for ${1}."
+}
+
+function generateGallery {
+  local loopVar satelliteDirectory lastRecordingFile sectionTitle howManyToday
+  local lastDir lastLog indexFile lastDateTime lastDate lastTime imagesHtml
+
+  for loopVar in "$@";
+  do
+    # Parameters need to come in the format [--NAME=VALUE], so that it becomes
+    # more readable.
+    local parameterName parameterValue
+    parameterName=$(echo ${loopVar} | cut -d "=" -f 1)
+    parameterValue=$(echo ${loopVar} | cut -d "=" -f 2-)
+
+    case "${parameterName}" in
+      "--satDir")
+        satelliteDirectory=$parameterValue
+        ;;
+
+      "--lastRecFile")
+        lastRecordingFile=$parameterValue
+        ;;
+        
+      "--title")
+        sectionTitle=$parameterValue
+        ;;
+
+      "--imagesHtml")
+        imagesHtml=$parameterValue
+        ;;
+
+      *)
+        echo "Invalid parameter option: ${parameterName}"
+        ;;
+    esac
+  done
+
+  # Make sure there are values for each parameter.
+  if [[ "${satelliteDirectory}" == "" || ! -d $satelliteDirectory ]];
+  then
+    echo "Invalid satellite directory: ${satelliteDirectory}"
+    echoSetValueFor "--satDir"
+  elif [ "${sectionTitle}" == "" ];
+  then
+    echo "Invalid section title: ${sectionTitle}"
+    echoSetValueFor "--title"
+  elif [[ "${lastRecordingFile}" == "" || ! -f $wwwDir/$lastRecordingFile ]];
+  then
+    echo "Invalid last recording file: ${lastRecordingFile}"
+    echo "Full path tried: ${wwwDir}/${lastRecordingFile}"
+    echoSetValueFor "--lastRecFile"
+  elif [ "${imagesHtml}" == "" ];
+  then
+    echo "Invalid images list: ${imagesHtml}"
+    echoSetValueFor "--imagesHtml"
+  fi
+
+  #  Start generating HTML file
+  
+  howManyToday=$(ls $satelliteDirectory/img/$(date +"%Y/%m/%d")/*.log 2> /dev/null| wc -l)
+  lastDir=$(dirname $(cat $wwwDir/$lastRecordingFile))
+  lastLog=$(basename $(cat $wwwDir/$lastRecordingFile))
+
+  # Generate title
+  echo "<h2>${sectionTitle}</h2>" >> $dirList
+  echo "<h4>Recent pass</h4>" >> $dirList
+  if [ $lastLog ];
+  then
+    # Get date and time of last recording
+    lastDateTime=$(echo $lastLog | cut -d "_" -f 1)
+    lastDate=$(echo $lastDateTime | cut -d "-" -f 1)
+    lastTime=$(echo $lastDateTime | cut -d "-" -f 2)
+    echo "<h6>($lastDate , $lastTime)</h6>" >> $dirList
+  fi
+  
+  # Generate images
+  echo "<a href='$lastDir/index.html'>" >> $dirList
+  echo "${imagesHtml}" >> $dirList
+  echo "</a>" >> $dirList
+  echo "<p></p>" >> $dirList
+
+  # Generate archive
+  echo "<h4>Archive</h4>" >> $dirList
+  echo "<ul>" >> $dirList
+  echo "<li><a href='${wwwRootPath}/${satelliteDirectory}/img/$(date +"%Y/%m/%d")/index.html'>Today</a>" >> $dirList
+  echo "<span class='badge badge-pill badge-light'>$howManyToday</span> </li>" >> $dirList
+
+  for y in $(ls $satelliteDirectory/img/ | sort -n)
+  do
+    echo "<li>$y<ul>" >> $dirList
+    for m in $(ls $satelliteDirectory/img/$y | sort -n)
+    do
+      echo "<li>($m)" >> $dirList
+      for d in $(ls $satelliteDirectory/img/$y/$m/ | sort -n)
+      do
+        indexFile="${satelliteDirectory}/img/$y/$m/$d/index.html"
+        # Only add a link to the index file if there is an index file.
+        if [[ -f "${indexFile}" ]];
+        then
+          # collect info about files in the directory
+          echo "<a href='${wwwRootPath}/${indexFile}'>$d</a> " >> $dirList
+        fi
+      done
+      echo "</li>" >> $dirList
+    done
+    echo "</ul></li>" >> $dirList
+  done
+  echo "</ul>" >> $dirList
+}
 
 # ---- NOAA list all dates and times  -------------------------------------------------#
 
 function gallery_noaa {
-
-howManyToday=$(ls $noaaDir/img/$(date +"%Y/%m/%d")/*.log 2> /dev/null| wc -l)
-
-noaaLastDir=$(dirname $(cat $wwwDir/noaa-last-recording.tmp))
-
-echo "<h2>NOAA recordings</h2>" >> $dirList
-echo "<h4>Recent pass</h4>" >> $dirList
-echo "<a href='$noaaLastDir/index.html'>" >> $dirList
-echo "<img src='$(cat $wwwDir/noaa-last-recording.tmp)-therm+map.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/noaa-last-recording.tmp)-MCIR-precip+map.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/noaa-last-recording.tmp)-HVC+map.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/noaa-last-recording.tmp)-NO+map.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "</a>" >> $dirList
-echo "<p></p>" >> $dirList
-
-echo "<h4>Archive</h4>" >> $dirList
-echo "<ul>" >> $dirList
-echo "<li><a href='${wwwRootPath}/recordings/noaa/img/$(date +"%Y/%m/%d")/index.html'>Today</a> <span class='badge badge-pill badge-light'>$howManyToday</span> </li>" >> $dirList
-
-for y in $(ls $noaaDir/img/ | sort -n)
-do
-  echo "<li>$y<ul>" >> $dirList
-  for m in $(ls $noaaDir/img/$y | sort -n)
-  do
-    echo "<li>($m)" >> $dirList
-    for d in $(ls $noaaDir/img/$y/$m/ | sort -n)
-    do
-      # collect info about files in the directory
-      echo "<a href='${wwwRootPath}/recordings/noaa/img/$y/$m/$d/index.html'>$d</a> " >> $dirList
-    done
-    echo "</li>" >> $dirList
-  done
-  echo "</ul></li>" >> $dirList
-done
-echo "</ul>" >> $dirList
-
+  local images lastRecFile
+  lastRecFile="noaa-last-recording.tmp"
+  images="<img src='$(cat $wwwDir/${lastRecFile})-therm+map.th.jpg' alt='recent recording' class='img-thumbnail' />"
+  images="${images} <img src='$(cat $wwwDir/${lastRecFile})-MCIR-precip+map.th.jpg' alt='recent recording' class='img-thumbnail' />"
+  images="${images} <img src='$(cat $wwwDir/${lastRecFile})-HVC+map.th.jpg' alt='recent recording' class='img-thumbnail' />"
+  images="${images} <img src='$(cat $wwwDir/${lastRecFile})-NO+map.th.jpg' alt='recent recording' class='img-thumbnail' />"
+  generateGallery --satDir=$noaaDir --title="NOAA Recordings" --lastRecFile="${lastRecFile}" --imagesHtml="${images}"
 } # end function gallery noaa
 
 # ---- METEOR list all dates and times  -------------------------------------------------#
 
 
 function gallery_meteor {
-
-howManyToday=$(ls $meteorDir/img/$(date +"%Y/%m/%d")/*-Ch0.jpg 2> /dev/null| wc -l)
-meteorLastDir=$(dirname $(cat $wwwDir/meteor-last-recording.tmp))
-
-
-echo "<h2>METEOR-M2 recordings</h2>" >> $dirList
-echo "<h4>Recent pass</h4>" >> $dirList
-echo "<a href='$meteorLastDir/index.html'>" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Ch0.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Ch1.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Ch2.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "<img src='$(cat $wwwDir/meteor-last-recording.tmp)-Combo.th.jpg' alt='recent recording' class='img-thumbnail' />" >> $dirList
-echo "</a>" >> $dirList
-
-echo "<p></p>" >> $dirList
-
-echo "<h4>Archive</h4>" >> $dirList
-echo "<ul>" >> $dirList
-echo "<li><a href='${wwwRootPath}/recordings/meteor/img/$(date +"%Y/%m/%d")/index.html'>Today</a> <span class='badge badge-pill badge-light'>$howManyToday</span> </li>" >> $dirList
-
-for y in $(ls $meteorDir/img/ | grep -v 'raw' | sort -n)
-do
-  echo "<li>$y<ul>" >> $dirList
-  for m in $(ls $meteorDir/img/$y | sort -n)
-  do
-    echo "<li>($m)" >> $dirList
-    for d in $(ls $meteorDir/img/$y/$m/ | sort -n)
-    do
-      # collect info about files in the directory
-      echo "<a href='${wwwRootPath}/recordings/meteor/img/$y/$m/$d/index.html'>$d</a> " >> $dirList
-    done
-    echo "</li>" >> $dirList
-  done
-  echo "</ul></li>" >> $dirList
-done
-echo "</ul>" >> $dirList
-
+  local images lastRecFile
+  lastRecFile="meteor-last-recording.tmp"
+  images="<img src='$(cat $wwwDir/${lastRecFile}).th.jpg' alt='recent recording' class='img-thumbnail' />"
+  generateGallery --satDir=$meteorDir --title="METEOR-M2 Recordings" --lastRecFile="${lastRecFile}" --imagesHtml="${images}"
 } # end function gallery meteor
 
 
