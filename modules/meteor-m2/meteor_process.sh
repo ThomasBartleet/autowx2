@@ -1,5 +1,6 @@
 #!/bin/bash
 
+source $baseDir/shell_functions.sh
 
 processedFile="${recdir}/${1}"
 imageFile="${imgdir}/${1}"
@@ -7,13 +8,32 @@ normalisedAudioFile="${processedFile}.wav"
 demodulatedAudioFile="${processedFile}.qpsk"
 decodedAudioFile="${processedFile}.dec"
 
+make_image() {
+  decodingType="${1}"
+  echo "**** ${decodingType}"
+  outputConversionImage="${imageFile}-125"
+  outputImage="${imageFile}.${imageExtension}"
+  if [ "${decodingType}" == "RGB" ]; then
+    debugEcho "Decoding colour image"
+    ./medet/medet_arm $decodedAudioFile "${outputConversionImage}" -r 66 -g 65 -b 64 -d
+  elif [ "${decodingType}" == "IR" ]; then
+    debugEcho "Decoding IR image"
+    ./medet/medet_arm $decodedAudioFile "${outputConversionImage}" -r 68 -g 68 -b 68 -d
+  fi
+
+  convert $resizeSwitch "${outputConversionImage}.bmp" "${outputImage}"
+  if [ -f "${outputImage}" ]; then
+    rm "${outputConversionImage}.bmp"
+  fi
+}
+
 
 # Demodulate the audio file
-echo "Demodulation in progress (QPSK)"
+debugEcho "Demodulation in progress (QPSK)"
 meteor_demod -B -o $demodulatedAudioFile $normalisedAudioFile
 
 # Decode th demoodulated file
-echo "Decoding in progress (QPSK to BMP)"
+debugEcho "Decoding in progress (QPSK to BMP)"
 ./medet/medet_arm $demodulatedAudioFile $processedFile -cd
 
 # Get the image file extension
@@ -23,20 +43,17 @@ fi
 
 # Should we resize the image?
 if [ "$resizeimageto" != "" ]; then
-  echo "Resizing image to $resizeimageto px"
+  debugEcho "Resizing image to $resizeimageto px"
   resizeSwitch="-resize ${resizeimageto}x${resizeimageto}>"
 fi
 
 # Decide the file and make image.
 if [ -f $decodedAudioFile ]; then
-    echo "I got a successful ${3}.dec file. Creating false color image"
-    ./medet/medet_arm $decodedAudioFile "${imageFile}-122" -r 68 -g 65 -b 64 -d
-    convert $resizeSwitch "${imageFile}-122.bmp" "${imageFile}.${imageExtension}"
-    if [ -f "${imageFile}.${imageExtension}" ]; then
-      rm "${imageFile}-122.bmp"
-    fi
+    debugEcho "I got a successful .dec file. Creating false color image"
+
+    make_image "RGB"
 else
-    echo "[DEBUG] Meteor Decoding failed, either a bad pass/low SNR or a software problem"
+    debugEcho "Meteor Decoding failed, either a bad pass/low SNR or a software problem"
 fi
 
 if [ "${removeFiles}" -ne "" ]; then
