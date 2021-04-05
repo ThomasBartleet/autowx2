@@ -7,7 +7,7 @@
 if ps -ef | grep -v grep | grep "autowx2.py" ;
 then
     # Do nothing. The process is already running.
-    exit 0
+    return 0
 else
     cd /home/pi/autowx2/
     $(MPLBACKEND=Agg python autowx2.py) & # & makes it run in the background.
