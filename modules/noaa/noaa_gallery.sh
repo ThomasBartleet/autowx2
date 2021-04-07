@@ -57,7 +57,8 @@ varFreq=$(sed '7q;d' $logFile)
 
 dateTime=$(date -d @$varStart +"%Y-%m-%d")
 dateTimeDir=$(date -d @$varStart +"%Y/%m/%d")  # directory format of date, eg. 2018/11/22/
-wwwPath=$wwwRootPath/recordings/noaa/img/$dateTimeDir
+wwwImagesPath="${localNoaaDir}/img"
+wwwPath="${wwwImagesPath}/${dateTimeDir}"
 
 echo $wwwPath/$fileNameCore > $wwwDir/noaa-last-recording.tmp
 

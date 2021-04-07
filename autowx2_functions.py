@@ -11,32 +11,45 @@
 #
 
 # for autowx2 itself
-from _crontab import *
-from datetime import datetime
-import os
-import predict
-import re
-import subprocess
-import sys
-import time
 from time import strftime
+import time
+import sys
+import subprocess
+import re
+import predict
+import os
+from os import listdir, mkdir, remove
+from os.path import isfile, join
+from datetime import datetime, timedelta
+from _crontab import *
+import signal
 
+# configuration - multiple lines because Codacy complains of line too long
+from autowx2_conf import scriptToRunInFreeTime
+from autowx2_conf import htmlNextPassList, wwwDir, calibrationTool, cleanupRtl
+from autowx2_conf import dongleShiftFile, stationName, ganttNextPassList
+from autowx2_conf import priorityTimeMargin, loggingDir, dongleShift
+from autowx2_conf import stationAlt, skipFirst, skipLast, minElev
+from autowx2_conf import tleFileName, satellitesData, stationLat, stationLon
+from autowx2_conf import updateKeplersScript
+import psutil
+import numpy as np
 
 # for plotting
 import matplotlib
-matplotlib.use('Agg')  # Force matplotlib to not use any Xwindows backend.
 import matplotlib.pyplot as plt
-import matplotlib.dates
-from matplotlib.dates import DateFormatter
-import numpy as np
+import matplotlib.dates as pltDates
 
-# configuration - multiple lines because Codacy complains of line too long
-from autowx2_conf import tleFileName, satellitesData, stationLat, stationLon
-from autowx2_conf import stationAlt, skipFirst, skipLast, minElev
-from autowx2_conf import priorityTimeMargin, loggingDir, dongleShift
-from autowx2_conf import dongleShiftFile, stationName, ganttNextPassList
-from autowx2_conf import htmlNextPassList, wwwDir, calibrationTool, cleanupRtl
-from autowx2_conf import scriptToRunInFreeTime
+# Sometimes this works, other times it doesn't. If this line doesn't work, a
+# message will appear saying
+#   Gdk-CRITICAL **: gdk_cursor_new_for_display: assertion 'GDK_IS_DISPLAY (display)' failed
+#   ...
+#   TypeError: constructor returned NULL
+# If this happens, run:
+# `MPLBACKEND=Agg python autowx2.py`
+# Solution taken from:
+# https://github.com/BVLC/caffe/issues/861#issuecomment-158118879
+matplotlib.use('Agg')  # Force matplotlib to not use any Xwindows backend.
 
 # ---------------------------------------------------------------------------- #
 
@@ -45,7 +58,8 @@ qth = (stationLat, stationLon, stationAlt)
 
 
 # Allow piping when running a shell/bash command.
-import signal
+
+
 def default_sigpipe():
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
@@ -66,7 +80,8 @@ def default_sigpipe():
 # is a way of just adding executables to a pre-existing process. More
 # information here: https://stackoverflow.com/a/9674162
 shell_scripts = ["sh", "shell_scripts.sh"]
-process = subprocess.Popen(shell_scripts, shell=False, stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True, preexec_fn=default_sigpipe)
+process = subprocess.Popen(shell_scripts, shell=False, stdin=subprocess.PIPE,
+                           stdout=subprocess.PIPE, universal_newlines=True, preexec_fn=default_sigpipe)
 
 
 def debugPrint(message):
@@ -163,7 +178,8 @@ def genPassTable(satellites, qth, howmany=20):
 
                 # transitEnd = transit.start + transit.duration() - skipLast
 
-                if not time.time() > transit.start + transit.duration() - skipLast - 1:  # esttimate the end of the transit, minus last 10 seconds
+                # esttimate the end of the transit, minus last 10 seconds
+                if not time.time() > transit.start + transit.duration() - skipLast - 1:
                     if int(transit.peak()['elevation']) >= minElev:
                         passTable[transit.start] = [satellite, int(
                             transit.start + skipFirst), int(
@@ -236,16 +252,35 @@ def t2humanMS(seconds):
     '''converts unix timestamp to human readable format MM:SS'''
     mm = int(seconds / 60)
     ss = seconds % 60
-    return "%02i:%02i" % (mm, ss)
+    return "00:%02i %02i" % (mm, ss)
+
+
+def t2humanHMS(seconds):
+    '''converts unix timestamp to human readable format HH:MM SS'''
+    mm = int(seconds / 60)
+    hh = int(mm / 60)
+    ss = seconds % 60
+    if (mm < 60):
+        return t2humanMS(seconds)
+    else:
+        mm = mm % 60
+        return "%02i:%02i %02i" % (hh, mm, ss)
+
+
+def t2humanDate(secs):
+    '''converts unix timestamp to human readable time format HH:MM'''
+    dateTimeNow = datetime.now()
+    dateTimeFuture = dateTimeNow + timedelta(seconds=secs)
+    return dateTimeFuture.strftime("%R")
 
 
 def printPass(satellite, start, duration, peak, azimuth, freq, processWith):
     return "● " + bc.OKGREEN + "%10s" % (satellite) + bc.ENDC + " :: " \
-        + bc.OKGREEN + t2human(start) + bc.ENDC + " to " + bc.OKGREEN  + t2human(start + int(duration)) + bc.ENDC \
+        + bc.OKGREEN + t2human(start) + bc.ENDC + " to " + bc.OKGREEN + t2human(start + int(duration)) + bc.ENDC \
         + ", dur: " + t2humanMS(duration) \
         + ", max el. " + str(int(peak)) + "°" + "; azimuth: " + str(int(azimuth)) + \
-                         "° (" + azimuth2dir(azimuth) + ") f=" + str(
-                             freq) + "Hz; Decoding: " + str(processWith)
+        "° (" + azimuth2dir(azimuth) + ") f=" + str(
+        freq) + "Hz; Decoding: " + str(processWith)
 
 
 def listNextPases(passTable, howmany):
@@ -255,14 +290,33 @@ def listNextPases(passTable, howmany):
         freq = satellitesData[satellite]['freq']
         processWith = satellitesData[satellite]['processWith']
         log(printPass(satellite, start, duration,
-            peak, azimuth, freq, processWith))
+                      peak, azimuth, freq, processWith))
         i += 1
 
 
+def getCurrentMemoryAvailability():
+    memory = psutil.virtual_memory()
+    return memory.available
+
+
+def logMemoryUsageForCommand(cmdline, memoryBeforeExecution):
+    # Might be getting some OOM issues. Using this method to determine where
+    # this might be happening.
+    memory = psutil.virtual_memory()
+    currentMemoryAvailability = memory.available
+    memoryUsed = '{0:,}'.format(
+        memoryBeforeExecution - currentMemoryAvailability)
+    memoryTotal = '{0:,}'.format(memory.total)
+    log("[DEBUG] Memory used when running %s" % cmdline)
+    log("[DEBUG] %s bytes (available: %s out of %s)" %
+        (memoryUsed, '{0:,}'.format(currentMemoryAvailability), memoryTotal))
+
+
 def justRun(cmdline, loggingDir, duration=-1):
+    memoryBeforeExecution = getCurrentMemoryAvailability()
     '''Just run the command as long as necesary and return the output'''
     outLogFile = logFile(loggingDir)
-    teeCommand = "tee -a %s" % outLogFile # quick and dirty hack to get log to file
+    teeCommand = "tee -a %s" % outLogFile  # quick and dirty hack to get log to file
 
     cmdline = "%s | %s" % (' '.join([str(x) for x in cmdline]), teeCommand)
     try:
@@ -289,10 +343,13 @@ def justRun(cmdline, loggingDir, duration=-1):
                     lineText = ""
 
         debugPrint("Process completed")
+
+        logMemoryUsageForCommand(cmdline, memoryBeforeExecution)
         return lines
     except OSError as e:
         log("✖ OS Error during command: " + " ".join(cmdline), style=bc.FAIL)
         log("✖ OS Error: " + e.strerror, style=bc.FAIL)
+        return ''
 
 
 def runTest(duration=3):
@@ -326,6 +383,7 @@ def runTest(duration=3):
         log("Not sure, if SDR device is there. Preventing access to potentially harmful devices.")
         return False
 
+
 def killRtl():
     log("Killing all remaining rtl_* processes...")
     justRun(["sh bin/kill_rtl.sh"], loggingDir)
@@ -338,7 +396,8 @@ def getDefaultDongleShift(dongleShift=dongleShift):
         newdongleShift = f.read().strip()
         f.close()
 
-        if newdongleShift != '' and is_number(newdongleShift):  # WARNING and newdongleShift is numeric:
+        # WARNING and newdongleShift is numeric:
+        if newdongleShift != '' and is_number(newdongleShift):
             dongleShift = str(float(newdongleShift))
             log("Recently used dongle shift is: " + str(dongleShift) + " ppm")
         else:
@@ -363,6 +422,17 @@ def calibrate(dongleShift=dongleShift):
     else:
         log("Using the good old dongle shift: " + str(dongleShift) + " ppm")
         return dongleShift
+
+
+def updateKeplers():
+    '''Update the Kepler data for the satellites'''
+    if (updateKeplersScript):
+        cmdline = [updateKeplersScript]
+        log("Updating keplers...")
+        justRun(cmdline, loggingDir).strip()
+        log("Updating keplers complete!")
+    else:
+        log("Using the old kepler data.")
 
 
 def azimuth2dir(azimuth):
@@ -418,6 +488,47 @@ def file_append(filename, content):
     f.close()
 
 
+def getDateTimeFromFileName(fileName):
+    if (fileName == None or len(fileName) == 0 or fileName.isspace()):
+        print("Invalid filename: %s" % fileName)
+        return None
+    fileNameSplit = fileName.split("/")
+    isolatedFileName = fileNameSplit[-1]  # Get last element
+
+    # The length of the file name must be 14:
+    # - 8 for date values (YYYY-MM-DD)
+    # - 2 for separator (-)
+    # - 4 for file extension
+    if (len(isolatedFileName) != 14):
+        print("Invalid filename: %s" % fileName)
+        return None
+
+    year = int(isolatedFileName[:4])
+    month = int(isolatedFileName[5:7])
+    day = int(isolatedFileName[8:10])
+
+    return datetime(year, month, day)
+
+
+def removeOldLogFiles(logDir):
+    # How will this fare with lots of files?
+    logFiles = [f for f in listdir(
+        logDir) if isfile(join(logDir, f))]  # https://stackoverflow.com/a/3207973
+
+    for logFile in logFiles:
+        dateTimeFile = getDateTimeFromFileName(logFile)
+        oldestTime = datetime.now() - \
+            timedelta(days=7)
+        # If the file's timestamp is older than the
+        # oldest allowed file, remove the file.
+        if (dateTimeFile != None and dateTimeFile < oldestTime):
+            try:
+                log("Removing %s" % logFile)
+                remove(logDir + logFile)
+            except OSError:
+                log("Failed to remove old file: %s" % logFile)
+
+
 # ------------ functions for generation of pass table, saving, png image etc...
 
 
@@ -443,20 +554,21 @@ def assignColorsToEvent(uniqueEvents):
                     'ISS': '#38FF06',
                     }
 
-    colors = ['#F646FF', 'yellow', 'orange', 'silver', 'magenta', 'red', 'white', '#FF2894', '#FF6E14']
+    colors = ['#F646FF', 'yellow', 'orange', 'silver',
+              'magenta', 'red', 'white', '#FF2894', '#FF6E14']
 
-    fixedColorsEvents = [event for event in eventsColors]     # events that have assigned fixed colors
+    # events that have assigned fixed colors
+    fixedColorsEvents = [event for event in eventsColors]
 
     # generate list of events with not assigned fixed color
     uniqueEventsToAssignColors = []
     for uniqueEvent in uniqueEvents:
-        if uniqueEvent not in  fixedColorsEvents:
+        if uniqueEvent not in fixedColorsEvents:
             uniqueEventsToAssignColors += [uniqueEvent]
 
     # assign colors to the events with not assigne fixed colrs and add them to dict
     for event, color in zip(uniqueEventsToAssignColors, colors):
         eventsColors[event] = color
-
 
     return eventsColors
 
@@ -480,7 +592,8 @@ def CreateGanttChart(listNextPasesListList):
 
     now = _create_date(time.time())
 
-    uniqueEvents = list(set([x[0] for x in listNextPasesListList])) # unique list of satellites
+    # unique list of satellites
+    uniqueEvents = list(set([x[0] for x in listNextPasesListList]))
     colorDict = assignColorsToEvent(uniqueEvents)
 
     ilen = len(ylabels)
@@ -501,7 +614,6 @@ def CreateGanttChart(listNextPasesListList):
             labelAlign = 'right'
             factor = -1
 
-
         ax.barh(
             (i * 0.5) + 0.5,
             end_date - start_date,
@@ -516,7 +628,7 @@ def CreateGanttChart(listNextPasesListList):
             end_date,
             (i * 0.5) + 0.55,
             ' %s | %s    ' % (t2humanHM(startdateIN),
-                          ylabelIN),
+                              ylabelIN),
             ha=labelAlign,
             va='center',
             fontsize=8,
@@ -536,7 +648,7 @@ def CreateGanttChart(listNextPasesListList):
     # print t2human(plotStart)
     # ax.set_xlim(_create_date(plotStart), _create_date(enddate+600))
 
-    Majorformatter = DateFormatter("%H:%M\n%d-%b")
+    Majorformatter = pltDates.DateFormatter("%H:%M\n%d-%b")
     ax.xaxis.set_major_formatter(Majorformatter)
     labelsx = ax.get_xticklabels()
     # plt.setp(labelsx, rotation=30, fontsize=10)
@@ -561,7 +673,8 @@ def listNextPasesHtml(passTable, howmany):
     # uniqueEvents
     # colorDict = assignColorsToEvent(listNextPasesListList)
     # print passTable[0:howmany]
-    uniqueEvents = list(set([x[0] for x in passTable[0:howmany]])) # unique list of satellites
+    # unique list of satellites
+    uniqueEvents = list(set([x[0] for x in passTable[0:howmany]]))
     colorDict = assignColorsToEvent(uniqueEvents)
 
     for satelitePass in passTable[0:howmany]:
@@ -588,13 +701,13 @@ def listNextPasesTxt(passTable, howmany):
     output += txtTemplate % (
         "#",
         "satellite",
-     "start",
-     "dur MM:SS",
-     "peak",
-     "az",
-     "az",
-     "freq",
-     "process with")
+        "start",
+        "dur MM:SS",
+        "peak",
+        "az",
+        "az",
+        "freq",
+        "process with")
 
     for satelitePass in passTable[0:howmany]:
         satellite, start, duration, peak, azimuth = satelitePass
@@ -617,6 +730,7 @@ def listNextPasesTxt(passTable, howmany):
 
     return output
 
+
 def listNextPasesShort(passTable, howmany=4):
     ''' list next passes in a sentence '''
 
@@ -625,9 +739,11 @@ def listNextPasesShort(passTable, howmany=4):
     for satelitePass in passTable[0:howmany]:
         satellite, start, duration, peak, azimuth = satelitePass
 
-        output += "%s (%s); " % (satellite, strftime('%H:%M', time.localtime(start)) )
+        output += "%s (%s); " % (satellite,
+                                 strftime('%H:%M', time.localtime(start)))
 
     return output
+
 
 def listNextPasesList(passTable, howmany):
     output = []
@@ -667,7 +783,6 @@ def generatePassTableAndSaveFiles(satellites, qth, verbose=True):
         print(listNextPasesTxt(passTable, 100))
 
 
-
 # --------------------------------------------------------------------------- #
 # --------- THE MAIN LOOP --------------------------------------------------- #
 # --------------------------------------------------------------------------- #
@@ -690,7 +805,8 @@ def mainLoop():
         # get the very next pass
         satelitePass = passTable[0]
         satellite, start, duration, peak, azimuth = satelitePass
-        satelliteNoSpaces = satellite.replace(" ", "-") #remove spaces from the satellite name
+        # remove spaces from the satellite name
+        satelliteNoSpaces = satellite.replace(" ", "-")
 
         freq = satellitesData[satellite]['freq']
         processWith = satellitesData[satellite]['processWith']
@@ -701,7 +817,7 @@ def mainLoop():
 
         log("Next pass:")
         log(printPass(satellite, start, duration,
-            peak, azimuth, freq, processWith))
+                      peak, azimuth, freq, processWith))
 
         towait = int(start - time.time())
 
@@ -709,7 +825,7 @@ def mainLoop():
             killRtl()
 
         # test if SDR dongle is available
-        if towait > 15: # if we have time to perform the test?
+        if towait > 15:  # if we have time to perform the test?
             while not runTest():
                 log("Waiting for the SDR dongle...")
                 time.sleep(10)
@@ -720,7 +836,7 @@ def mainLoop():
             debugPrint("Time to wait: %d seconds" % towait)
             # here the recording happens
             log("!! Recording " + printPass(satellite, start, duration,
-                peak, azimuth, freq, processWith), style=bc.WARNING)
+                                            peak, azimuth, freq, processWith), style=bc.WARNING)
 
             processCmdline = [
                 processWith,
@@ -743,16 +859,29 @@ def mainLoop():
         else:
             # recalculating waiting time
             if towait > 300:
-                    log("Recalibrating the dongle...")
-                    dongleShift = calibrate(dongleShift)  # replace the global value
+                log("Recalibrating the dongle...")
+                # replace the global value
+                dongleShift = calibrate(dongleShift)
 
             towait = int(start - time.time())
+
+            # If we still have some time left over, let's update the Kepler data
+            if towait > 120:
+                updateKeplers()
+                towait = int(start - time.time())
+
+            # If we STILL have some time left over, remove old log files.
+            if towait > 60:
+                removeOldLogFiles(loggingDir)
+                towait = int(start - time.time())
+
             if scriptToRunInFreeTime:
-                if towait >= 120:  # if we have more than [some] minutes spare time, let's do something useful
+                # if we have more than [some] minutes spare time, let's do something useful
+                if towait >= 120:
                     log("We have still %ss free time to the next pass. Let's do something useful!" %
                         (t2humanMS(towait - 1)))
                     log("Running: %s for %ss" %
-                        (scriptToRunInFreeTime, t2humanMS(towait - 1)))
+                        (scriptToRunInFreeTime, t2humanHMS(towait - 1)))
                     justRun(
                         [scriptToRunInFreeTime,
                          towait - 1,
@@ -761,11 +890,14 @@ def mainLoop():
                         towait - 1)
                     # scrript with run time and dongle shift as arguments
                 else:
-                    log("Sleeping for: " + t2humanMS(towait - 1) + "s")
+                    log("Sleeping for: %ss (next fly-over at %s)" %
+                        (t2humanHMS(towait - 1), t2humanDate(towait - 1)))
                     time.sleep(towait - 1)
             else:
                 towait = int(start - time.time())
-                log("Sleeping for: " + t2humanMS(towait - 1) + "s")
+                log("Sleeping for: %ss (next fly-over at %s)" %
+                    (t2humanHMS(towait - 1), t2humanDate(towait - 1)))
                 time.sleep(towait - 1)
+
 
 logfile = logFile(loggingDir)

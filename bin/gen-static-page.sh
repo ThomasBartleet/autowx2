@@ -22,8 +22,8 @@ source $baseDir/_listvars.sh
 # wwwDir="/home/filips/github/autowx2/var/www/"
 
 
-noaaDir=$recordingDir/noaa
-meteorDir=$recordingDir/meteor
+noaaDir="recordings/noaa/"
+meteorDir="recordings/meteor/"
 
 dirList="$wwwDir/noaa_dirlist.tmp"
 htmlTemplate="$wwwDir/index.tpl"
@@ -107,7 +107,7 @@ function generateGallery {
   done
 
   # Make sure there are values for each parameter.
-  if [[ "${satelliteDirectory}" == "" || ! -d $satelliteDirectory ]];
+  if [[ "${satelliteDirectory}" == "" || ! -d $wwwDir/$satelliteDirectory ]];
   then
     echo "Invalid satellite directory: ${satelliteDirectory}"
     echoSetValueFor "--satDir"
@@ -128,7 +128,7 @@ function generateGallery {
 
   #  Start generating HTML file
   
-  howManyToday=$(ls $satelliteDirectory/img/$(date +"%Y/%m/%d")/*.log 2> /dev/null| wc -l)
+  howManyToday=$(ls $wwwDir/$satelliteDirectory/img/$(date +"%Y/%m/%d")/*.log 2> /dev/null| wc -l)
   lastDir=$(dirname $(cat $wwwDir/$lastRecordingFile))
   lastLog=$(basename $(cat $wwwDir/$lastRecordingFile))
 
@@ -156,17 +156,17 @@ function generateGallery {
   echo "<li><a href='${wwwRootPath}/${satelliteDirectory}/img/$(date +"%Y/%m/%d")/index.html'>Today</a>" >> $dirList
   echo "<span class='badge badge-pill badge-light'>$howManyToday</span> </li>" >> $dirList
 
-  for y in $(ls $satelliteDirectory/img/ | sort -n)
+  for y in $(ls $wwwDir/$satelliteDirectory/img/ | sort -n)
   do
     echo "<li>$y<ul>" >> $dirList
-    for m in $(ls $satelliteDirectory/img/$y | sort -n)
+    for m in $(ls $wwwDir/$satelliteDirectory/img/$y | sort -n)
     do
       echo "<li>($m)" >> $dirList
-      for d in $(ls $satelliteDirectory/img/$y/$m/ | sort -n)
+      for d in $(ls $wwwDir/$satelliteDirectory/img/$y/$m/ | sort -n)
       do
         indexFile="${satelliteDirectory}/img/$y/$m/$d/index.html"
         # Only add a link to the index file if there is an index file.
-        if [[ -f "${indexFile}" ]];
+        if [[ -f "${wwwDir}/${indexFile}" ]];
         then
           # collect info about files in the directory
           echo "<a href='${wwwRootPath}/${indexFile}'>$d</a> " >> $dirList
@@ -206,22 +206,22 @@ function gallery_meteor {
 # ---- ISS loop all dates and times  -------------------------------------------------#
 function gallery_iss {
 
-howManyToday=$(ls $recordingDir/iss/rec/$(date +"%Y/%m/")/*.log 2> /dev/null| wc -l)
+  howManyToday=$(ls $recordingDir/iss/rec/$(date +"%Y/%m/")/*.log 2> /dev/null| wc -l)
 
-echo "<h2>ISS recordings</h2>" >> $dirList
-echo "<ul>" >> $dirList
-echo "<li><a href='${wwwRootPath}/recordings/iss/rec/$(date +"%Y/%m/")'>Current month</a> <span class='badge badge-pill badge-light'>$howManyToday</span>" >> $dirList
+  echo "<h2>ISS recordings</h2>" >> $dirList
+  echo "<ul>" >> $dirList
+  echo "<li><a href='${wwwRootPath}/recordings/iss/rec/$(date +"%Y/%m/")'>Current month</a> <span class='badge badge-pill badge-light'>$howManyToday</span>" >> $dirList
 
-for y in $(ls $recordingDir/iss/rec/ | sort -n)
-do
-  echo "<li>($y) " >> $dirList
-  for m in $(ls $recordingDir/iss/rec/$y | sort -n)
+  for y in $(ls $recordingDir/iss/rec/ | sort -n)
   do
-    echo "<a href='${wwwRootPath}/recordings/iss/rec/$y/$m/'>$m</a> " >> $dirList
+    echo "<li>($y) " >> $dirList
+    for m in $(ls $recordingDir/iss/rec/$y | sort -n)
+    do
+      echo "<a href='${wwwRootPath}/recordings/iss/rec/$y/$m/'>$m</a> " >> $dirList
+    done
+    echo "</li>" >> $dirList
   done
-  echo "</li>" >> $dirList
-done
-echo "</ul>" >> $dirList
+  echo "</ul>" >> $dirList
 
 }
 
